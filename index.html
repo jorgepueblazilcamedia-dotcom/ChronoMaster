@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChronoMaster - El Reto del Cronómetro</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Tone.js for Sound Effects -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at center, #252830 0%, #1C1D21 100%);
+      color: #C9CCD3;
+      min-height: 100vh;
+      touch-action: manipulation; /* Optimización táctil para evitar zoom doble tap */
+    }
+    .font-mono-digits {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-card {
+      background: rgba(28, 29, 33, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(201, 204, 211, 0.15);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+    .glass-btn {
+      background: rgba(201, 204, 211, 0.08);
+      border: 1px solid rgba(201, 204, 211, 0.2);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-btn:hover:not(:disabled) {
+      background: rgba(201, 204, 211, 0.18);
+      transform: translateY(-2px);
+    }
+    .glass-btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .btn-action {
+      box-shadow: 0 10px 25px -5px rgba(25, 211, 197, 0.4);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-action:hover {
+      box-shadow: 0 15px 30px -5px rgba(25, 211, 197, 0.6);
+    }
+    .pulse-glow {
+      animation: pulse-glow-anim 2s infinite ease-in-out;
+    }
+    @keyframes pulse-glow-anim {
+      0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); }
+      50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.8); }
+    }
+    .shake {
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-3 sm:p-6 select-none overflow-x-hidden">
+
+  <!-- Header -->
+  <header class="w-full max-w-4xl flex justify-between items-center mb-3 sm:mb-4 z-10">
+    <div class="flex items-center gap-2.5 sm:gap-3">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#19D3C5] flex items-center justify-center shadow-lg shadow-[#19D3C5]/30">
+        <i class="fa-solid fa-stopwatch text-lg sm:text-xl text-[#1C1D21]"></i>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-[#C9CCD3]">
+        Chrono<span class="text-[#19D3C5]">Master</span>
+      </h1>
+    </div>
+
+    <!-- Mute / Sound Toggle -->
+    <button id="soundToggleBtn" class="glass-btn px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#C9CCD3] hover:text-white">
+      <i id="soundIcon" class="fa-solid fa-volume-high text-[#19D3C5]"></i>
+      <span id="soundText">Sonido</span>
+    </button>
+  </header>
+
+  <!-- Main Game Container -->
+  <main class="w-full max-w-2xl flex-1 flex flex-col justify-center items-center z-10 my-1 sm:my-2">
+
+    <!-- Mode Selector Navigation -->
+    <div id="modeSelector" class="w-full glass-card p-1 sm:p-1.5 rounded-2xl grid grid-cols-2 sm:flex sm:flex-nowrap gap-1 mb-4 sm:mb-6">
+      <button onclick="setMode('reto')" id="nav-reto" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
+        <i class="fa-solid fa-bullseye"></i> Reto 5s/10s
+      </button>
+      <button onclick="setMode('ciegas')" id="nav-ciegas" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
+        <i class="fa-solid fa-eye-slash"></i> A Ciegas
+      </button>
+      <button onclick="setMode('fiesta')" id="nav-fiesta" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
+        <i class="fa-solid fa-users"></i> Modo Fiesta
+      </button>
+      <button onclick="setMode('bomba')" id="nav-bomba" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
+        <i class="fa-solid fa-bomb"></i> Bomba
+      </button>
+    </div>
+
+    <!-- Main Game Board -->
+    <div id="gameBoard" class="w-full glass-card rounded-3xl p-4 sm:p-10 flex flex-col items-center justify-between relative overflow-hidden min-h-[400px]">
+      
+      <!-- Top Info / Subheader of Mode -->
+      <div id="modeHeader" class="text-center w-full mb-3 sm:mb-4">
+        <span id="modeBadge" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#19D3C5]/20 text-[#19D3C5] border border-[#19D3C5]/30 uppercase tracking-wider mb-1.5">
+          El Reto
+        </span>
+        <h2 id="modeTitle" class="text-lg sm:text-2xl font-bold text-white">Detén el tiempo en la meta</h2>
+        <p id="modeDesc" class="text-xs sm:text-sm text-[#C9CCD3]/70 mt-1 max-w-md mx-auto">
+          Presiona el botón para detener el reloj exactamente en la marca sin pasarte.
+        </p>
+      </div>
+
+      <!-- Settings / Mode Options Bar (Dynamic) -->
+      <div id="modeControls" class="w-full flex justify-center items-center gap-3 mb-4 sm:mb-6">
+        <!-- Sub-options will be injected here via JavaScript -->
+      </div>
+
+      <!-- DISPLAY / DISPLAY CLOCK -->
+      <div class="relative my-2 sm:my-4 flex flex-col items-center justify-center">
+        <!-- Circular Graphic Outline -->
+        <div class="w-48 h-48 sm:w-64 sm:h-64 rounded-full border-4 border-[#C9CCD3]/20 flex flex-col items-center justify-center relative bg-[#1C1D21] shadow-inner">
+          
+          <!-- Hidden / Blind Mask Icon -->
+          <div id="blindMask" class="hidden absolute inset-0 bg-[#1C1D21]/95 rounded-full flex flex-col items-center justify-center text-[#C9CCD3] z-10 backdrop-blur-md">
+            <i class="fa-solid fa-eye-slash text-3xl sm:text-4xl mb-2 animate-bounce text-[#19D3C5]"></i>
+            <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-wider">Reloj Oculto</span>
+          </div>
+
+          <!-- Chronometer Digits -->
+          <span id="timeDisplay" class="font-mono-digits text-3xl sm:text-5xl font-extrabold tracking-tight text-white drop-shadow-md">
+            00:00.000
+          </span>
+
+          <!-- Subtext inside circle (Goal or Status) -->
+          <span id="targetDisplay" class="text-xs sm:text-sm font-semibold text-[#19D3C5] mt-2 text-center px-2 truncate max-w-[90%]">
+            META: 5.000 s
+          </span>
+        </div>
+      </div>
+
+      <!-- Party Mode Leaderboard (Only in Fiesta Mode) -->
+      <div id="partyLeaderboard" class="hidden w-full my-3 bg-[#1C1D21]/60 rounded-2xl p-3 sm:p-4 border border-[#C9CCD3]/20">
+        <div class="flex justify-between items-center mb-2 px-1">
+          <span class="text-[11px] sm:text-xs font-bold text-[#C9CCD3]/70 uppercase tracking-wider">Jugadores & Resultados</span>
+          <span id="partyTurnInfo" class="text-[11px] sm:text-xs font-bold text-[#19D3C5]">Turno de Jugador 1</span>
+        </div>
+        <div id="playersGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Action Button Area -->
+      <div class="w-full flex flex-col items-center gap-3 mt-3 sm:mt-4">
+        <button id="mainActionBtn" onclick="handleMainAction()" class="w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-[#19D3C5] hover:bg-[#16c4b7] font-extrabold text-base sm:text-lg text-[#1C1D21] btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3">
+          <i id="mainActionIcon" class="fa-solid fa-play text-[#1C1D21]"></i>
+          <span id="mainActionText">INICIAR RETO</span>
+        </button>
+      </div>
+
+      <!-- Result Modal / Card Banner -->
+      <div id="resultModal" class="hidden absolute inset-0 bg-[#1C1D21]/95 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6 text-center z-20 animate-fade-in">
+        <div id="resultIcon" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40">
+          <i class="fa-solid fa-trophy"></i>
+        </div>
+        <h3 id="resultTitle" class="text-xl sm:text-2xl font-black text-white mb-1">¡Increíble Precisión!</h3>
+        <p id="resultSub" class="text-xs sm:text-sm text-[#C9CCD3] mb-4">Error total: 0.042 segundos</p>
+        
+        <div class="bg-[#1C1D21] rounded-xl p-4 w-full max-w-xs mb-6 border border-[#C9CCD3]/20 text-left space-y-2">
+          <div class="flex justify-between text-xs">
+            <span class="text-[#C9CCD3]/70">Meta:</span>
+            <span id="resTarget" class="font-bold text-white">5.000 s</span>
+          </div>
+          <div class="flex justify-between text-xs">
+            <span class="text-[#C9CCD3]/70">Tu Tiempo / Ganador:</span>
+            <span id="resActual" class="font-bold text-white">5.042 s</span>
+          </div>
+          <div class="flex justify-between text-xs">
+            <span class="text-[#C9CCD3]/70">Diferencia:</span>
+            <span id="resDiff" class="font-bold text-[#19D3C5]">+0.042 s</span>
+          </div>
+        </div>
+
+        <button onclick="closeResultModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#19D3C5] hover:bg-[#16c4b7] text-[#1C1D21] font-bold text-sm transition-all shadow-lg shadow-[#19D3C5]/30 active:scale-95">
+          Intentar de nuevo
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer Info -->
+  <footer class="w-full max-w-4xl text-center py-2 text-xs text-[#C9CCD3]/50 z-10">
+    <p>ChronoMaster &copy; Juego de Precisión y Cronómetro - ¡Entrena tu reloj biológico!</p>
+  </footer>
+
+  <script>
+    /* ===================================================================
+       AUDIO SYNTHESIS (Tone.js)
+       =================================================================== */
+    let soundEnabled = true;
+    let synth, bombSynth;
+
+    function initAudio() {
+      if (!synth && typeof Tone !== 'undefined') {
+        synth = new Tone.Synth({
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+        }).toDestination();
+
+        bombSynth = new Tone.MembraneSynth().toDestination();
+      }
+    }
+
+    function playBeep(freq = 440, duration = '8n') {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        Tone.start();
+        synth.triggerAttackRelease(freq, duration);
+      } catch (e) {}
+    }
+
+    function playExplosion() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        Tone.start();
+        bombSynth.triggerAttackRelease("C1", "8n");
+      } catch (e) {}
+    }
+
+    document.getElementById('soundToggleBtn').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('soundIcon');
+      const text = document.getElementById('soundText');
+      if (soundEnabled) {
+        icon.className = 'fa-solid fa-volume-high text-[#19D3C5]';
+        text.innerText = 'Sonido';
+        playBeep(600, '16n');
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark text-[#C9CCD3]/50';
+        text.innerText = 'Mute';
+      }
+    });
+
+    /* ===================================================================
+       GAME STATE MANAGEMENT
+       =================================================================== */
+    let currentMode = 'reto'; // 'reto', 'ciegas', 'fiesta', 'bomba'
+    let isRunning = false;
+    let startTime = 0;
+    let elapsedTime = 0;
+    let timerAnimationId = null;
+
+    // Mode-specific configurations
+    let retoTarget = 5.0; // 5 or 10 seconds
+    let ciegasTarget = 7.0; // Random or set
+    let ciegasHideTime = 2.0; // Hide display after X seconds
+    
+    // Fiesta Mode State
+    let partyPlayerCount = 3;
+    let partyCurrentPlayerIndex = 0;
+    let partyTarget = 5.0;
+    let partyPlayers = []; // [{name: 'Jugador 1', totalError: 0}]
+
+    // Bomba Mode State
+    let bombTimeLimit = 0; // Random 10 to 120s
+
+    // Elements DOM
+    const timeDisplay = document.getElementById('timeDisplay');
+    const targetDisplay = document.getElementById('targetDisplay');
+    const blindMask = document.getElementById('blindMask');
+    const mainActionBtn = document.getElementById('mainActionBtn');
+    const mainActionText = document.getElementById('mainActionText');
+    const mainActionIcon = document.getElementById('mainActionIcon');
+    const modeControls = document.getElementById('modeControls');
+    const modeBadge = document.getElementById('modeBadge');
+    const modeTitle = document.getElementById('modeTitle');
+    const modeDesc = document.getElementById('modeDesc');
+    const partyLeaderboard = document.getElementById('partyLeaderboard');
+    const playersGrid = document.getElementById('playersGrid');
+    const partyTurnInfo = document.getElementById('partyTurnInfo');
+    const gameBoard = document.getElementById('gameBoard');
+
+    /* Soporte Táctil Móvil */
+    mainActionBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // Evita retardo táctil de 300ms en navegadores móviles
+      handleMainAction();
+    });
+
+    /* ===================================================================
+       MODE SWITCHING & INITIALIZATION
+       =================================================================== */
+    function setMode(mode) {
+      if (isRunning) stopTimer();
+      currentMode = mode;
+
+      // Update Nav Buttons Styles
+      document.querySelectorAll('.mode-nav-btn').forEach(btn => {
+        btn.classList.remove('bg-[#19D3C5]', 'text-[#1C1D21]', 'shadow-md');
+        btn.classList.add('text-[#C9CCD3]', 'hover:text-white');
+      });
+      const activeNav = document.getElementById(`nav-${mode}`);
+      if (activeNav) {
+        activeNav.classList.add('bg-[#19D3C5]', 'text-[#1C1D21]', 'shadow-md');
+        activeNav.classList.remove('text-[#C9CCD3]');
+      }
+
+      // Hide Party Leaderboard & Blind Mask by default
+      partyLeaderboard.classList.add('hidden');
+      blindMask.classList.add('hidden');
+      resetDisplay();
+
+      // Configure Layout per Mode
+      if (mode === 'reto') {
+        modeBadge.innerText = 'El Reto';
+        modeBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#19D3C5]/20 text-[#19D3C5] border border-[#19D3C5]/30 uppercase tracking-wider mb-1.5';
+        modeTitle.innerText = 'Reto de Precisión Exalta';
+        modeDesc.innerText = 'Detén el reloj exactamente en la marca configurada sin pasarte.';
+        
+        modeControls.innerHTML = `
+          <div class="flex items-center gap-2 bg-[#1C1D21]/80 p-1.5 rounded-xl border border-[#C9CCD3]/20 text-xs">
+            <span class="text-[#C9CCD3]/70 pl-2">Objetivo:</span>
+            <button onclick="setRetoTarget(5)" id="btnTarget5" class="px-3 py-1.5 rounded-lg font-bold transition-all ${retoTarget === 5 ? 'bg-[#19D3C5] text-[#1C1D21]' : 'text-[#C9CCD3] hover:bg-slate-800'}">5s</button>
+            <button onclick="setRetoTarget(10)" id="btnTarget10" class="px-3 py-1.5 rounded-lg font-bold transition-all ${retoTarget === 10 ? 'bg-[#19D3C5] text-[#1C1D21]' : 'text-[#C9CCD3] hover:bg-slate-800'}">10s</button>
+          </div>
+        `;
+        targetDisplay.innerText = `META: ${retoTarget.toFixed(3)} s`;
+      } 
+      else if (mode === 'ciegas') {
+        modeBadge.innerText = 'A Ciegas';
+        modeBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#19D3C5]/20 text-[#19D3C5] border border-[#19D3C5]/30 uppercase tracking-wider mb-1.5';
+        modeTitle.innerText = 'Calcula el tiempo en tu mente';
+        modeDesc.innerText = 'El cronómetro se ocultará tras 2 segundos. Confía en tu reloj interno.';
+        
+        ciegasTarget = Math.floor(Math.random() * 6) + 5; // Random goal between 5s and 10s
+        modeControls.innerHTML = `
+          <div class="flex items-center gap-2 bg-[#1C1D21]/80 p-2 px-4 rounded-xl border border-[#C9CCD3]/20 text-xs">
+            <span class="text-[#C9CCD3]/70">Meta Generada:</span>
+            <span class="font-bold text-[#19D3C5] text-sm">${ciegasTarget}.000 s</span>
+          </div>
+        `;
+        targetDisplay.innerText = `META: ${ciegasTarget.toFixed(3)} s`;
+      } 
+      else if (mode === 'fiesta') {
+        modeBadge.innerText = 'Modo Fiesta';
+        modeBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#19D3C5]/20 text-[#19D3C5] border border-[#19D3C5]/30 uppercase tracking-wider mb-1.5';
+        modeTitle.innerText = 'Desafío Multijugador';
+        modeDesc.innerText = 'Compite con 2 a 12 amigos. Haz clic en el nombre para editarlo.';
+        
+        modeControls.innerHTML = `
+          <div class="flex items-center gap-2 bg-[#1C1D21]/80 p-1.5 rounded-xl border border-[#C9CCD3]/20 text-xs flex-wrap justify-center">
+            <span class="text-[#C9CCD3]/70 pl-1">Jugadores:</span>
+            <input type="range" min="2" max="12" value="${partyPlayerCount}" onchange="updatePartyPlayersCount(this.value)" class="accent-[#19D3C5] cursor-pointer w-20 sm:w-28">
+            <span id="partyCountLbl" class="font-bold text-[#19D3C5] text-xs sm:text-sm min-w-[1.5rem] text-center">${partyPlayerCount}</span>
+          </div>
+        `;
+        partyLeaderboard.classList.remove('hidden');
+        initPartyMode();
+      } 
+      else if (mode === 'bomba') {
+        modeBadge.innerText = 'Bomba Aleatoria';
+        modeBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wider mb-1.5';
+        modeTitle.innerText = '¡Pasa la bomba antes de que explote!';
+        modeDesc.innerText = 'La bomba explotará en un tiempo secreto (entre 10 y 120s). ¡Pulsa para pasarla!';
+        
+        modeControls.innerHTML = `
+          <div class="flex items-center gap-2 bg-[#1C1D21]/80 p-2 px-4 rounded-xl border border-[#C9CCD3]/20 text-xs text-red-400">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>¡Tiempo límite impredecible!</span>
+          </div>
+        `;
+        targetDisplay.innerText = `¡DETÉN O PASA A TIEMPO!`;
+      }
+    }
+
+    /* Helper for Reto Target */
+    function setRetoTarget(val) {
+      if (isRunning) return;
+      retoTarget = val;
+      document.getElementById('btnTarget5').className = `px-3 py-1.5 rounded-lg font-bold transition-all ${val === 5 ? 'bg-[#19D3C5] text-[#1C1D21]' : 'text-[#C9CCD3] hover:bg-slate-800'}`;
+      document.getElementById('btnTarget10').className = `px-3 py-1.5 rounded-lg font-bold transition-all ${val === 10 ? 'bg-[#19D3C5] text-[#1C1D21]' : 'text-[#C9CCD3] hover:bg-slate-800'}`;
+      targetDisplay.innerText = `META: ${retoTarget.toFixed(3)} s`;
+    }
+
+    /* Timer Controls & Display Logic */
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      const milliseconds = Math.floor(ms % 1000);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+    }
+
+    function resetDisplay() {
+      elapsedTime = 0;
+      timeDisplay.innerText = "00:00.000";
+      blindMask.classList.add('hidden');
+      mainActionText.innerText = isRunning ? 'DETENER' : 'INICIAR RETO';
+      mainActionIcon.className = isRunning ? 'fa-solid fa-stop text-white' : 'fa-solid fa-play text-[#1C1D21]';
+      mainActionBtn.className = isRunning 
+        ? 'w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 font-extrabold text-base sm:text-lg text-white btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3'
+        : 'w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-[#19D3C5] hover:bg-[#16c4b7] font-extrabold text-base sm:text-lg text-[#1C1D21] btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
+    }
+
+    function updateTimer() {
+      if (!isRunning) return;
+      const now = performance.now();
+      elapsedTime = (now - startTime) / 1000;
+      timeDisplay.innerText = formatTime(elapsedTime * 1000);
+
+      // Blind mode hide after 2 seconds
+      if (currentMode === 'ciegas' && elapsedTime >= ciegasHideTime) {
+        blindMask.classList.remove('hidden');
+      }
+
+      // Bomb mode check explosion
+      if (currentMode === 'bomba' && elapsedTime >= bombTimeLimit) {
+        triggerBombExplosion();
+        return;
+      }
+
+      timerAnimationId = requestAnimationFrame(updateTimer);
+    }
+
+    function startTimer() {
+      isRunning = true;
+      startTime = performance.now() - (elapsedTime * 1000);
+      
+      if (currentMode === 'bomba') {
+        bombTimeLimit = Math.random() * (120 - 10) + 10; // Random limit between 10s and 120s
+      }
+
+      mainActionText.innerText = currentMode === 'bomba' ? '¡PASAR LA BOMBA!' : 'DETENER';
+      mainActionIcon.className = currentMode === 'bomba' ? 'fa-solid fa-hand-holding-hand text-white' : 'fa-solid fa-stop text-white';
+      mainActionBtn.className = 'w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 font-extrabold text-base sm:text-lg text-white btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
+      
+      playBeep(523.25, '16n');
+      timerAnimationId = requestAnimationFrame(updateTimer);
+    }
+
+    function stopTimer() {
+      isRunning = false;
+      cancelAnimationFrame(timerAnimationId);
+      blindMask.classList.add('hidden');
+      
+      mainActionText.innerText = 'INICIAR RETO';
+      mainActionIcon.className = 'fa-solid fa-play text-[#1C1D21]';
+      mainActionBtn.className = 'w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-[#19D3C5] hover:bg-[#16c4b7] font-extrabold text-base sm:text-lg text-[#1C1D21] btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
+
+      evaluateResults();
+    }
+
+    function handleMainAction() {
+      if (!isRunning) {
+        startTimer();
+      } else {
+        if (currentMode === 'bomba') {
+          // Pass bomb: reset timer slightly or give sound effect feedback
+          playBeep(700, '16n');
+          // Restart timer run from current moment
+          startTime = performance.now();
+        } else {
+          stopTimer();
+        }
+      }
+    }
+
+    /* Helper for Party Mode Setup */
+    function updatePartyPlayersCount(val) {
+      const newCount = parseInt(val);
+      if (newCount > partyPlayerCount) {
+        // Add new players maintaining existing custom names if any
+        for (let i = partyPlayerCount + 1; i <= newCount; i++) {
+          partyPlayers.push({ name: `Jugador ${i}`, error: 0, played: false });
+        }
+      } else if (newCount < partyPlayerCount) {
+        // Trim list
+        partyPlayers = partyPlayers.slice(0, newCount);
+      }
+      partyPlayerCount = newCount;
+      document.getElementById('partyCountLbl').innerText = partyPlayerCount;
+      if (partyCurrentPlayerIndex >= partyPlayerCount) {
+        partyCurrentPlayerIndex = 0;
+      }
+      renderPartyGrid();
+      updatePartyTurnDisplay();
+    }
+
+    function initPartyMode() {
+      partyCurrentPlayerIndex = 0;
+      if (partyPlayers.length !== partyPlayerCount) {
+        partyPlayers = [];
+        for (let i = 1; i <= partyPlayerCount; i++) {
+          partyPlayers.push({ name: `Jugador ${i}`, error: 0, played: false });
+        }
+      } else {
+        partyPlayers.forEach(p => {
+          p.error = 0;
+          p.played = false;
+        });
+      }
+      renderPartyGrid();
+      updatePartyTurnDisplay();
+    }
+
+    function updatePartyTurnDisplay() {
+      const currentName = partyPlayers[partyCurrentPlayerIndex] ? partyPlayers[partyCurrentPlayerIndex].name : `Jugador ${partyCurrentPlayerIndex + 1}`;
+      targetDisplay.innerText = `TURNO: ${currentName.toUpperCase()} (META: ${partyTarget.toFixed(3)}s)`;
+      partyTurnInfo.innerText = `Turno de ${currentName} (${partyCurrentPlayerIndex + 1}/${partyPlayerCount})`;
+    }
+
+    function updatePlayerName(index, newName) {
+      const trimmed = newName.trim();
+      if (trimmed !== '') {
+        partyPlayers[index].name = trimmed;
+      } else {
+        partyPlayers[index].name = `Jugador ${index + 1}`;
+      }
+      updatePartyTurnDisplay();
+    }
+
+    function renderPartyGrid() {
+      playersGrid.innerHTML = '';
+      partyPlayers.forEach((p, index) => {
+        const isCurrent = index === partyCurrentPlayerIndex;
+        const card = document.createElement('div');
+        card.className = `p-2 rounded-xl border flex flex-col items-center justify-center transition-all ${
+          isCurrent 
+            ? 'bg-[#19D3C5]/20 border-[#19D3C5] scale-[1.02] shadow-md ring-2 ring-[#19D3C5]/50' 
+            : p.played ? 'bg-[#1C1D21] border-[#C9CCD3]/20 opacity-80' : 'bg-[#1C1D21]/40 border-[#C9CCD3]/10'
+        }`;
+        
+        card.innerHTML = `
+          <div class="flex items-center gap-1 max-w-full mb-0.5">
+            <input type="text" value="${p.name}" 
+              onchange="updatePlayerName(${index}, this.value)"
+              ${isRunning ? 'disabled' : ''}
+              class="text-[11px] font-bold uppercase tracking-wider text-center bg-transparent border-b border-transparent hover:border-[#C9CCD3]/40 focus:border-[#19D3C5] focus:outline-none w-full truncate ${isCurrent ? 'text-[#19D3C5] font-extrabold' : 'text-[#C9CCD3]'}" 
+              title="Haz clic para editar nombre" />
+            <i class="fa-solid fa-pen text-[9px] text-[#C9CCD3]/40 cursor-pointer"></i>
+          </div>
+          <span class="font-mono-digits text-xs sm:text-sm font-bold ${p.played ? (p.error < 0.2 ? 'text-[#19D3C5]' : 'text-amber-400') : 'text-[#C9CCD3]/40'}">
+            ${p.played ? '+' + p.error.toFixed(3) + 's' : '---'}
+          </span>
+        `;
+        playersGrid.appendChild(card);
+      });
+    }
+
+    /* ===================================================================
+       RESULTS & MODALS EVALUATION
+       =================================================================== */
+    function evaluateResults() {
+      let target = 0;
+
+      if (currentMode === 'reto') target = retoTarget;
+      else if (currentMode === 'ciegas') target = ciegasTarget;
+      else if (currentMode === 'fiesta') target = partyTarget;
+
+      const diff = elapsedTime - target;
+      const absDiff = Math.abs(diff);
+
+      if (currentMode === 'fiesta') {
+        // Save current player score
+        partyPlayers[partyCurrentPlayerIndex].error = absDiff;
+        partyPlayers[partyCurrentPlayerIndex].played = true;
+
+        // Sound effect
+        playBeep(absDiff < 0.2 ? 880 : 330, '8n');
+
+        // Check if Party Round Finished
+        if (partyCurrentPlayerIndex < partyPlayerCount - 1) {
+          partyCurrentPlayerIndex++;
+          renderPartyGrid();
+          updatePartyTurnDisplay();
+          return; // Continue with next player without full popup yet
+        } else {
+          renderPartyGrid();
+          showPartyWinnerModal();
+          return;
+        }
+      }
+
+      // Show Result Modal for Reto and Ciegas
+      showResultModal(target, elapsedTime, diff);
+    }
+
+    function showPartyWinnerModal() {
+      // Find player with minimal error
+      let winner = partyPlayers[0];
+      partyPlayers.forEach(p => {
+        if (p.error < winner.error) winner = p;
+      });
+
+      const modal = document.getElementById('resultModal');
+      const resIcon = document.getElementById('resultIcon');
+      const resTitle = document.getElementById('resultTitle');
+      const resSub = document.getElementById('resultSub');
+      const resTarget = document.getElementById('resTarget');
+      const resActual = document.getElementById('resActual');
+      const resDiff = document.getElementById('resDiff');
+
+      resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
+      resTitle.innerText = `¡GANADOR: ${winner.name.toUpperCase()}! 🏆`;
+      resSub.innerText = `Con el menor error acumulado en la ronda.`;
+
+      resTarget.innerText = `Jugadores: ${partyPlayerCount}`;
+      resActual.innerText = `${winner.name}`;
+      resDiff.innerText = `Error: +${winner.error.toFixed(3)}s`;
+
+      fireConfetti();
+      modal.classList.remove('hidden');
+    }
+
+    function showResultModal(target, actual, diff) {
+      const modal = document.getElementById('resultModal');
+      const resIcon = document.getElementById('resultIcon');
+      const resTitle = document.getElementById('resultTitle');
+      const resSub = document.getElementById('resultSub');
+      const resTarget = document.getElementById('resTarget');
+      const resActual = document.getElementById('resActual');
+      const resDiff = document.getElementById('resDiff');
+
+      const absDiff = Math.abs(diff);
+
+      if (absDiff <= 0.05) {
+        resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
+        resTitle.innerText = '¡PERFECCIÓN CASI ABSOLUTA! 🎯';
+        fireConfetti();
+      } else if (absDiff <= 0.2) {
+        resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
+        resTitle.innerText = '¡Gran Precisión! ⚡';
+      } else {
+        resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#C9CCD3]/20 text-[#C9CCD3] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#C9CCD3]/40';
+        resTitle.innerText = '¡Buen Intento! ⏱️';
+      }
+
+      resSub.innerText = `Diferencia de error: ${absDiff.toFixed(3)} segundos`;
+      resTarget.innerText = `${target.toFixed(3)} s`;
+      resActual.innerText = `${actual.toFixed(3)} s`;
+      resDiff.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(3)} s`;
+
+      playBeep(absDiff < 0.1 ? 880 : 440, '8n');
+      modal.classList.remove('hidden');
+    }
+
+    function triggerBombExplosion() {
+      isRunning = false;
+      cancelAnimationFrame(timerAnimationId);
+      playExplosion();
+
+      const modal = document.getElementById('resultModal');
+      const resIcon = document.getElementById('resultIcon');
+      const resTitle = document.getElementById('resultTitle');
+      const resSub = document.getElementById('resultSub');
+      const resTarget = document.getElementById('resTarget');
+      const resActual = document.getElementById('resActual');
+      const resDiff = document.getElementById('resDiff');
+
+      gameBoard.classList.add('shake');
+      setTimeout(() => gameBoard.classList.remove('shake'), 600);
+
+      resIcon.className = 'w-16 h-16 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-3xl mb-3 border border-red-500/40';
+      resTitle.innerText = '¡BOOOOOOM! 💥';
+      resSub.innerText = 'La bomba explotó en tus manos.';
+
+      resTarget.innerText = `Límite Secreto:`;
+      resActual.innerText = `${bombTimeLimit.toFixed(3)} s`;
+      resDiff.innerText = `¡Explotó!`;
+
+      mainActionText.innerText = 'REINICIAR BOMBA';
+      mainActionBtn.className = 'w-full sm:w-4/5 py-4 px-8 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 font-extrabold text-lg text-white btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
+      mainActionIcon.className = 'fa-solid fa-rotate-right text-white';
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeResultModal() {
+      document.getElementById('resultModal').classList.add('hidden');
+      if (currentMode === 'fiesta') {
+        initPartyMode();
+      }
+      resetDisplay();
+    }
+
+    function fireConfetti() {
+      if (typeof confetti !== 'undefined') {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
+    /* Initialize Default Mode on Load */
+    window.onload = function() {
+      setMode('reto');
+    };
+  </script>
+</body>
+</html>
