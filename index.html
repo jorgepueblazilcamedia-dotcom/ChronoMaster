@@ -93,7 +93,7 @@
   <main class="w-full max-w-2xl flex-1 flex flex-col justify-center items-center z-10 my-1 sm:my-2">
 
     <!-- Mode Selector Navigation -->
-    <div id="modeSelector" class="w-full glass-card p-1 sm:p-1.5 rounded-2xl grid grid-cols-2 sm:flex sm:flex-nowrap gap-1 mb-4 sm:mb-6">
+    <div id="modeSelector" class="w-full glass-card p-1 sm:p-1.5 rounded-2xl grid grid-cols-3 gap-1 mb-4 sm:mb-6">
       <button onclick="setMode('reto')" id="nav-reto" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
         <i class="fa-solid fa-bullseye"></i> Reto 5s/10s
       </button>
@@ -102,9 +102,6 @@
       </button>
       <button onclick="setMode('fiesta')" id="nav-fiesta" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
         <i class="fa-solid fa-users"></i> Modo Fiesta
-      </button>
-      <button onclick="setMode('bomba')" id="nav-bomba" class="mode-nav-btn py-2.5 px-2.5 sm:px-3 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200">
-        <i class="fa-solid fa-bomb"></i> Bomba
       </button>
     </div>
 
@@ -162,7 +159,7 @@
       </div>
 
       <!-- Action Button Area -->
-      <div class="w-full flex flex-col items-center gap-3 mt-3 sm:mt-4">
+      <div id="actionBtnContainer" class="w-full flex flex-col items-center justify-center gap-3 mt-3 sm:mt-4 min-h-[70px] relative">
         <button id="mainActionBtn" onclick="handleMainAction()" class="w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-[#19D3C5] hover:bg-[#16c4b7] font-extrabold text-base sm:text-lg text-[#1C1D21] btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3">
           <i id="mainActionIcon" class="fa-solid fa-play text-[#1C1D21]"></i>
           <span id="mainActionText">INICIAR RETO</span>
@@ -192,7 +189,17 @@
           </div>
         </div>
 
-        <button onclick="closeResultModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#19D3C5] hover:bg-[#16c4b7] text-[#1C1D21] font-bold text-sm transition-all shadow-lg shadow-[#19D3C5]/30 active:scale-95">
+        <!-- Tabla de Clasificación Final para Modo Fiesta -->
+        <div id="partyFinalLeaderboard" class="hidden w-full max-w-md bg-[#1C1D21] rounded-xl p-3 border border-[#C9CCD3]/20 mb-6 max-h-52 overflow-y-auto">
+          <div class="text-xs font-bold text-[#19D3C5] uppercase tracking-wider mb-2 text-center border-b border-[#C9CCD3]/10 pb-1">
+            Tabla de Posiciones Final
+          </div>
+          <div id="partyLeaderboardRows" class="space-y-1.5 text-xs text-left">
+            <!-- Filas ordenadas dinámicamente -->
+          </div>
+        </div>
+
+        <button id="resultModalBtn" onclick="closeResultModal()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#19D3C5] hover:bg-[#16c4b7] text-[#1C1D21] font-bold text-sm transition-all shadow-lg shadow-[#19D3C5]/30 active:scale-95">
           Intentar de nuevo
         </button>
       </div>
@@ -210,7 +217,7 @@
        AUDIO SYNTHESIS (Tone.js)
        =================================================================== */
     let soundEnabled = true;
-    let synth, bombSynth;
+    let synth;
 
     function initAudio() {
       if (!synth && typeof Tone !== 'undefined') {
@@ -218,8 +225,6 @@
           oscillator: { type: 'sine' },
           envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
         }).toDestination();
-
-        bombSynth = new Tone.MembraneSynth().toDestination();
       }
     }
 
@@ -229,15 +234,6 @@
         initAudio();
         Tone.start();
         synth.triggerAttackRelease(freq, duration);
-      } catch (e) {}
-    }
-
-    function playExplosion() {
-      if (!soundEnabled) return;
-      try {
-        initAudio();
-        Tone.start();
-        bombSynth.triggerAttackRelease("C1", "8n");
       } catch (e) {}
     }
 
@@ -258,7 +254,7 @@
     /* ===================================================================
        GAME STATE MANAGEMENT
        =================================================================== */
-    let currentMode = 'reto'; // 'reto', 'ciegas', 'fiesta', 'bomba'
+    let currentMode = 'reto'; // 'reto', 'ciegas', 'fiesta'
     let isRunning = false;
     let startTime = 0;
     let elapsedTime = 0;
@@ -274,9 +270,6 @@
     let partyCurrentPlayerIndex = 0;
     let partyTarget = 5.0;
     let partyPlayers = []; // [{name: 'Jugador 1', totalError: 0}]
-
-    // Bomba Mode State
-    let bombTimeLimit = 0; // Random 10 to 120s
 
     // Elements DOM
     const timeDisplay = document.getElementById('timeDisplay');
@@ -377,20 +370,6 @@
         `;
         partyLeaderboard.classList.remove('hidden');
         initPartyMode();
-      } 
-      else if (mode === 'bomba') {
-        modeBadge.innerText = 'Bomba Aleatoria';
-        modeBadge.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wider mb-1.5';
-        modeTitle.innerText = '¡Pasa la bomba antes de que explote!';
-        modeDesc.innerText = 'La bomba explotará en un tiempo secreto (entre 10 y 120s). ¡Pulsa para pasarla!';
-        
-        modeControls.innerHTML = `
-          <div class="flex items-center gap-2 bg-[#1C1D21]/80 p-2 px-4 rounded-xl border border-[#C9CCD3]/20 text-xs text-red-400">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span>¡Tiempo límite impredecible!</span>
-          </div>
-        `;
-        targetDisplay.innerText = `¡DETÉN O PASA A TIEMPO!`;
       }
     }
 
@@ -429,6 +408,7 @@
       elapsedTime = 0;
       timeDisplay.innerText = "00:00.000";
       blindMask.classList.add('hidden');
+      mainActionText.style.display = 'inline';
       mainActionText.innerText = isRunning ? 'DETENER' : 'INICIAR RETO';
       mainActionIcon.className = isRunning ? 'fa-solid fa-stop text-white' : 'fa-solid fa-play text-[#1C1D21]';
       mainActionBtn.className = isRunning 
@@ -447,27 +427,18 @@
         blindMask.classList.remove('hidden');
       }
 
-      // Bomb mode check explosion
-      if (currentMode === 'bomba' && elapsedTime >= bombTimeLimit) {
-        triggerBombExplosion();
-        return;
-      }
-
       timerAnimationId = requestAnimationFrame(updateTimer);
     }
 
     function startTimer() {
       isRunning = true;
       startTime = performance.now() - (elapsedTime * 1000);
-      
-      if (currentMode === 'bomba') {
-        bombTimeLimit = Math.random() * (120 - 10) + 10; // Random limit between 10s and 120s
-      }
 
-      mainActionText.innerText = currentMode === 'bomba' ? '¡PASAR LA BOMBA!' : 'DETENER';
-      mainActionIcon.className = currentMode === 'bomba' ? 'fa-solid fa-hand-holding-hand text-white' : 'fa-solid fa-stop text-white';
+      mainActionText.style.display = 'inline';
+      mainActionText.innerText = 'DETENER';
+      mainActionIcon.className = 'fa-solid fa-stop text-white';
       mainActionBtn.className = 'w-full sm:w-4/5 py-4 sm:py-5 px-6 sm:px-8 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 font-extrabold text-base sm:text-lg text-white btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
-      
+
       playBeep(523.25, '16n');
       timerAnimationId = requestAnimationFrame(updateTimer);
     }
@@ -488,14 +459,7 @@
       if (!isRunning) {
         startTimer();
       } else {
-        if (currentMode === 'bomba') {
-          // Pass bomb: reset timer slightly or give sound effect feedback
-          playBeep(700, '16n');
-          // Restart timer run from current moment
-          startTime = performance.now();
-        } else {
-          stopTimer();
-        }
+        stopTimer();
       }
     }
 
@@ -503,12 +467,10 @@
     function updatePartyPlayersCount(val) {
       const newCount = parseInt(val);
       if (newCount > partyPlayerCount) {
-        // Add new players maintaining existing custom names if any
         for (let i = partyPlayerCount + 1; i <= newCount; i++) {
           partyPlayers.push({ name: `Jugador ${i}`, error: 0, played: false });
         }
       } else if (newCount < partyPlayerCount) {
-        // Trim list
         partyPlayers = partyPlayers.slice(0, newCount);
       }
       partyPlayerCount = newCount;
@@ -541,6 +503,7 @@
       const currentName = partyPlayers[partyCurrentPlayerIndex] ? partyPlayers[partyCurrentPlayerIndex].name : `Jugador ${partyCurrentPlayerIndex + 1}`;
       targetDisplay.innerText = `TURNO: ${currentName.toUpperCase()} (META: ${partyTarget.toFixed(3)}s)`;
       partyTurnInfo.innerText = `Turno de ${currentName} (${partyCurrentPlayerIndex + 1}/${partyPlayerCount})`;
+      resetDisplay();
     }
 
     function updatePlayerName(index, newName) {
@@ -595,36 +558,81 @@
       const absDiff = Math.abs(diff);
 
       if (currentMode === 'fiesta') {
-        // Save current player score
         partyPlayers[partyCurrentPlayerIndex].error = absDiff;
         partyPlayers[partyCurrentPlayerIndex].played = true;
 
-        // Sound effect
+        renderPartyGrid();
         playBeep(absDiff < 0.2 ? 880 : 330, '8n');
 
-        // Check if Party Round Finished
-        if (partyCurrentPlayerIndex < partyPlayerCount - 1) {
-          partyCurrentPlayerIndex++;
-          renderPartyGrid();
-          updatePartyTurnDisplay();
-          return; // Continue with next player without full popup yet
-        } else {
-          renderPartyGrid();
-          showPartyWinnerModal();
-          return;
-        }
+        showPartyTurnModal(target, elapsedTime, diff);
+        return;
       }
 
-      // Show Result Modal for Reto and Ciegas
       showResultModal(target, elapsedTime, diff);
     }
 
     function showPartyWinnerModal() {
-      // Find player with minimal error
-      let winner = partyPlayers[0];
-      partyPlayers.forEach(p => {
-        if (p.error < winner.error) winner = p;
+      const sortedPlayers = [...partyPlayers].sort((a, b) => a.error - b.error);
+      const winner = sortedPlayers[0];
+
+      const modal = document.getElementById('resultModal');
+      const resIcon = document.getElementById('resultIcon');
+      const resTitle = document.getElementById('resultTitle');
+      const resSub = document.getElementById('resultSub');
+      const resTarget = document.getElementById('resTarget');
+      const modalBtn = document.getElementById('resultModalBtn');
+
+      const partyFinalLeaderboard = document.getElementById('partyFinalLeaderboard');
+      const partyLeaderboardRows = document.getElementById('partyLeaderboardRows');
+
+      resTarget.parentElement.parentElement.classList.add('hidden');
+      partyFinalLeaderboard.classList.remove('hidden');
+
+      partyLeaderboardRows.innerHTML = '';
+      sortedPlayers.forEach((p, idx) => {
+        const row = document.createElement('div');
+        const isWinner = idx === 0;
+        const isLast = idx === sortedPlayers.length - 1;
+
+        let badge = `<span class="w-5 text-center font-bold text-[#C9CCD3]/70">#${idx + 1}</span>`;
+        if (isWinner) badge = `<span class="w-5 text-center text-amber-400 font-black">🥇</span>`;
+        else if (idx === 1) badge = `<span class="w-5 text-center text-gray-300 font-black">🥈</span>`;
+        else if (idx === 2) badge = `<span class="w-5 text-center text-amber-600 font-black">🥉</span>`;
+        else if (isLast && sortedPlayers.length > 2) badge = `<span class="w-5 text-center text-red-400 font-black">💀</span>`;
+
+        row.className = `flex justify-between items-center p-2 rounded-lg ${
+          isWinner 
+            ? 'bg-[#19D3C5]/20 border border-[#19D3C5]/50 text-[#19D3C5] font-bold' 
+            : isLast 
+              ? 'bg-red-500/10 border border-red-500/30 text-red-300' 
+              : 'bg-black/30 border border-[#C9CCD3]/10 text-white'
+        }`;
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2 truncate pr-2">
+            ${badge}
+            <span class="truncate ${isWinner ? 'font-black text-[#19D3C5]' : 'font-semibold text-white'}">${p.name}</span>
+          </div>
+          <span class="font-mono-digits text-xs font-bold ${isWinner ? 'text-[#19D3C5]' : 'text-[#C9CCD3]'}">
+            +${p.error.toFixed(3)}s
+          </span>
+        `;
+        partyLeaderboardRows.appendChild(row);
       });
+
+      resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
+      resTitle.innerText = `¡GANADOR: ${winner.name.toUpperCase()}! 🏆`;
+      resSub.innerText = `Resultados finales ordenados de menor a mayor error.`;
+
+      modalBtn.innerText = "Nueva Ronda 🔄";
+
+      fireConfetti();
+      modal.classList.remove('hidden');
+    }
+
+    function showPartyTurnModal(target, actual, diff) {
+      const currentPlayer = partyPlayers[partyCurrentPlayerIndex];
+      const isLastPlayer = partyCurrentPlayerIndex === partyPlayerCount - 1;
 
       const modal = document.getElementById('resultModal');
       const resIcon = document.getElementById('resultIcon');
@@ -633,16 +641,34 @@
       const resTarget = document.getElementById('resTarget');
       const resActual = document.getElementById('resActual');
       const resDiff = document.getElementById('resDiff');
+      const modalBtn = document.getElementById('resultModalBtn');
+      const partyFinalLeaderboard = document.getElementById('partyFinalLeaderboard');
 
-      resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
-      resTitle.innerText = `¡GANADOR: ${winner.name.toUpperCase()}! 🏆`;
-      resSub.innerText = `Con el menor error acumulado en la ronda.`;
+      resTarget.parentElement.parentElement.classList.remove('hidden');
+      partyFinalLeaderboard.classList.add('hidden');
 
-      resTarget.innerText = `Jugadores: ${partyPlayerCount}`;
-      resActual.innerText = `${winner.name}`;
-      resDiff.innerText = `Error: +${winner.error.toFixed(3)}s`;
+      const absDiff = Math.abs(diff);
 
-      fireConfetti();
+      if (absDiff <= 0.05) {
+        resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#19D3C5]/20 text-[#19D3C5] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#19D3C5]/40';
+        resTitle.innerText = `¡TURNO DE ${currentPlayer.name.toUpperCase()}! 🎯`;
+      } else {
+        resIcon.className = 'w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#C9CCD3]/20 text-[#C9CCD3] flex items-center justify-center text-2xl sm:text-3xl mb-3 border border-[#C9CCD3]/40';
+        resTitle.innerText = `TURNO DE ${currentPlayer.name.toUpperCase()}`;
+      }
+
+      resSub.innerText = `Error obtenido: ${absDiff.toFixed(3)} segundos`;
+      resTarget.innerText = `${target.toFixed(3)} s`;
+      resActual.innerText = `${actual.toFixed(3)} s`;
+      resDiff.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(3)} s`;
+
+      if (isLastPlayer) {
+        modalBtn.innerText = "Ver Resultados Finales 🏆";
+      } else {
+        const nextPlayerName = partyPlayers[partyCurrentPlayerIndex + 1] ? partyPlayers[partyCurrentPlayerIndex + 1].name : `Jugador ${partyCurrentPlayerIndex + 2}`;
+        modalBtn.innerText = `Siguiente: ${nextPlayerName} ➡️`;
+      }
+
       modal.classList.remove('hidden');
     }
 
@@ -654,6 +680,11 @@
       const resTarget = document.getElementById('resTarget');
       const resActual = document.getElementById('resActual');
       const resDiff = document.getElementById('resDiff');
+      const modalBtn = document.getElementById('resultModalBtn');
+      const partyFinalLeaderboard = document.getElementById('partyFinalLeaderboard');
+
+      resTarget.parentElement.parentElement.classList.remove('hidden');
+      partyFinalLeaderboard.classList.add('hidden');
 
       const absDiff = Math.abs(diff);
 
@@ -674,60 +705,43 @@
       resActual.innerText = `${actual.toFixed(3)} s`;
       resDiff.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(3)} s`;
 
+      modalBtn.innerText = "Intentar de nuevo";
+
       playBeep(absDiff < 0.1 ? 880 : 440, '8n');
-      modal.classList.remove('hidden');
-    }
-
-    function triggerBombExplosion() {
-      isRunning = false;
-      cancelAnimationFrame(timerAnimationId);
-      playExplosion();
-
-      const modal = document.getElementById('resultModal');
-      const resIcon = document.getElementById('resultIcon');
-      const resTitle = document.getElementById('resultTitle');
-      const resSub = document.getElementById('resultSub');
-      const resTarget = document.getElementById('resTarget');
-      const resActual = document.getElementById('resActual');
-      const resDiff = document.getElementById('resDiff');
-
-      gameBoard.classList.add('shake');
-      setTimeout(() => gameBoard.classList.remove('shake'), 600);
-
-      resIcon.className = 'w-16 h-16 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-3xl mb-3 border border-red-500/40';
-      resTitle.innerText = '¡BOOOOOOM! 💥';
-      resSub.innerText = 'La bomba explotó en tus manos.';
-
-      resTarget.innerText = `Límite Secreto:`;
-      resActual.innerText = `${bombTimeLimit.toFixed(3)} s`;
-      resDiff.innerText = `¡Explotó!`;
-
-      mainActionText.innerText = 'REINICIAR BOMBA';
-      mainActionBtn.className = 'w-full sm:w-4/5 py-4 px-8 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 font-extrabold text-lg text-white btn-action transform active:scale-95 transition-all duration-150 flex items-center justify-center gap-3';
-      mainActionIcon.className = 'fa-solid fa-rotate-right text-white';
-
       modal.classList.remove('hidden');
     }
 
     function closeResultModal() {
       document.getElementById('resultModal').classList.add('hidden');
       if (currentMode === 'fiesta') {
-        initPartyMode();
+        if (partyCurrentPlayerIndex < partyPlayerCount - 1) {
+          partyCurrentPlayerIndex++;
+          renderPartyGrid();
+          updatePartyTurnDisplay();
+        } else if (partyPlayers.every(p => p.played) && partyPlayers[partyCurrentPlayerIndex].played) {
+          const modalTitle = document.getElementById('resultTitle').innerText;
+          if (modalTitle.startsWith('¡GANADOR:')) {
+            initPartyMode();
+          } else {
+            showPartyWinnerModal();
+          }
+        }
+      } else {
+        resetDisplay();
       }
-      resetDisplay();
     }
 
     function fireConfetti() {
-      if (typeof confetti !== 'undefined') {
+      if (typeof confetti === 'function') {
         confetti({
-          particleCount: 80,
+          particleCount: 100,
           spread: 70,
           origin: { y: 0.6 }
         });
       }
     }
 
-    /* Initialize Default Mode on Load */
+    // Inicializar el juego al cargar la página
     window.onload = function() {
       setMode('reto');
     };
